@@ -213,7 +213,7 @@ class TextDecoder(nn.Module):
 class Whisper(nn.Module):
     def __init__(self, dims: ModelDimensions):
         super().__init__()
-        self.dims = dims
+        self.dims = torch.jit.script(dims)
         self.encoder = AudioEncoder(
             self.dims.n_mels,
             self.dims.n_audio_ctx,
