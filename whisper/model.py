@@ -242,5 +242,4 @@ class Whisper(nn.Module):
         return self.decoder(tokens, audio_features, kv_cache)
 
     def forward(self, mel: torch.Tensor, tokens: torch.Tensor) -> Tensor:
-        assert False
         return self.decoder(tokens, self.encoder(mel))
