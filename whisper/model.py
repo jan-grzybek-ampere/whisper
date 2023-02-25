@@ -9,10 +9,9 @@ from torch import Tensor
 from torch import nn
 
 
-class ModelDimensions(nn.Module):
+class ModelDimensions:
     def __init__(self, n_mels: int, n_audio_ctx: int, n_audio_state: int, n_audio_head: int, n_audio_layer: int,
                  n_vocab: int, n_text_ctx: int, n_text_state: int, n_text_head: int, n_text_layer: int):
-        super().__init__()
         self.n_mels = n_mels
         self.n_audio_ctx = n_audio_ctx
         self.n_audio_state = n_audio_state
@@ -23,9 +22,6 @@ class ModelDimensions(nn.Module):
         self.n_text_state = n_text_state
         self.n_text_head = n_text_head
         self.n_text_layer = n_text_layer
-
-    def forward(self) -> int:
-        return self.n_mels
 
 
 class LayerNorm(nn.Module):
@@ -232,10 +228,6 @@ class Whisper(nn.Module):
             self.dims.n_text_head,
             self.dims.n_text_layer,
         )
-
-    @torch.jit.export
-    def get_dims(self) -> int:
-        return self.dims()
 
     @torch.jit.export
     def embed_audio(self, mel: torch.Tensor):
