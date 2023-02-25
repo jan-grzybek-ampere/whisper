@@ -9,10 +9,9 @@ from torch import Tensor
 from torch import nn
 
 
-class ModelDimensions(torch.nn.Module):
+class ModelDimensions:
     def __init__(self, n_mels: int, n_audio_ctx: int, n_audio_state: int, n_audio_head: int, n_audio_layer: int,
                  n_vocab: int, n_text_ctx: int, n_text_state: int, n_text_head: int, n_text_layer: int):
-        super().__init__()
         self.n_mels = n_mels
         self.n_audio_ctx = n_audio_ctx
         self.n_audio_state = n_audio_state
@@ -213,7 +212,8 @@ class TextDecoder(nn.Module):
 class Whisper(nn.Module):
     def __init__(self, dims: ModelDimensions):
         super().__init__()
-        self.dims = torch.jit.script(dims)
+        self.dims = dims
+        self.is_multilingual = self.dims.n_vocab == 51865
         self.encoder = AudioEncoder(
             self.dims.n_mels,
             self.dims.n_audio_ctx,
@@ -230,16 +230,16 @@ class Whisper(nn.Module):
         )
 
     @torch.jit.export
+    def noname(self):
+        return self.dims, self.is_multilingual
+
+    @torch.jit.export
     def embed_audio(self, mel: torch.Tensor):
         return self.encoder(mel)
 
     @torch.jit.export
     def logits(self, tokens: torch.Tensor, audio_features: torch.Tensor):
         return self.decoder(tokens, audio_features)
-
-    @torch.jit.export
-    def is_multilingual(self):
-        return self.dims.n_vocab == 51865
 
     def forward(self, mel: torch.Tensor, tokens: torch.Tensor) -> Tensor:
         return self.decoder(tokens, self.encoder(mel))
