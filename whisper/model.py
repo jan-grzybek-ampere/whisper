@@ -211,6 +211,7 @@ class TextDecoder(nn.Module):
 
 
 class Whisper(nn.Module):
+    @torch.jit.export
     def __init__(self, dims):
         super().__init__()
         self.dims = ModelDimensions(**dims)
