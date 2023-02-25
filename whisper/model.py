@@ -9,7 +9,6 @@ from torch import Tensor
 from torch import nn
 
 from .transcribe import transcribe as transcribe_function
-from .decoding import detect_language as detect_language_function, decode as decode_function
 
 
 class ModelDimensions:
@@ -240,7 +239,3 @@ class Whisper(nn.Module):
     @property
     def is_multilingual(self):
         return self.dims.n_vocab == 51865
-
-    detect_language = detect_language_function
-    transcribe = transcribe_function
-    decode = decode_function
