@@ -211,7 +211,6 @@ class TextDecoder(nn.Module):
 
 
 class Whisper(nn.Module):
-    @torch.jit.export
     def __init__(self, dims: ModelDimensions):
         super().__init__()
         self.dims = dims
@@ -230,6 +229,10 @@ class Whisper(nn.Module):
             self.dims.n_text_head,
             self.dims.n_text_layer,
         )
+
+    @torch.jit.export
+    def get_dims(self) -> ModelDimensions:
+        return self.dims
 
     @torch.jit.export
     def embed_audio(self, mel: torch.Tensor):
