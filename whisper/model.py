@@ -213,7 +213,7 @@ class Whisper(nn.Module):
     def __init__(self, dims: ModelDimensions):
         super().__init__()
         self.dims = torch.jit.export(dims)
-        self.is_multilingual = torch.jit.export(self.dims.n_vocab == 51865)
+        self.is_multilingual = self.dims.n_vocab == 51865
         self.encoder = AudioEncoder(
             self.dims.n_mels,
             self.dims.n_audio_ctx,
