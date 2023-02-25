@@ -81,15 +81,15 @@ class MultiHeadAttention(nn.Module):
     ):
         q = self.query(x)
 
-        if kv_cache is None or xa is None or hash(self.key) not in kv_cache:
+        if kv_cache is None or xa is None or id(self.key) not in kv_cache:
             # hooks, if installed (i.e. kv_cache is not None), will prepend the cached kv tensors;
             # otherwise, perform key/value projections for self- or cross-attention as usual.
             k = self.key(x if xa is None else xa)
             v = self.value(x if xa is None else xa)
         else:
             # for cross-attention, calculate keys and values once and reuse in subsequent calls.
-            k = kv_cache[hash(self.key)]
-            v = kv_cache[hash(self.value)]
+            k = kv_cache[id(self.key)]
+            v = kv_cache[id(self.value)]
 
         wv, qk = self.qkv_attention(q, k, v, mask)
         return self.out(wv), qk
@@ -196,7 +196,7 @@ class TextDecoder(nn.Module):
             kv_cache_values = list(kv_cache.values())
             if len(kv_cache_values) > 0:
                 offset = kv_cache_values[0].shape[1]
-                
+
         x = self.token_embedding(x) + self.positional_embedding[offset: offset + x.shape[-1]]
         x = x.to(xa.dtype)
 

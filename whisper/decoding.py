@@ -148,7 +148,7 @@ def install_kv_cache_hooks(model, cache: Optional[Dict[int, Tensor]] = None):
     hooks = []
 
     def save_to_cache(module, _, output):
-        hash_of_module = hash(module)
+        hash_of_module = id(module)
         if hash_of_module not in cache or output.shape[1] > model.decoder.positional_embedding.shape[0]:
             cache[hash_of_module] = output  # save as-is, for the first token or cross attention
         else:
