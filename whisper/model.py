@@ -10,20 +10,20 @@ from torch import nn
 
 
 @torch.jit.export
-class ModelDimensions(torch.jit.ScriptModule):
+class ModelDimensions(torch.nn.Module):
     def __init__(self, n_mels: int, n_audio_ctx: int, n_audio_state: int, n_audio_head: int, n_audio_layer: int,
                  n_vocab: int, n_text_ctx: int, n_text_state: int, n_text_head: int, n_text_layer: int):
-        super(ModelDimensions, self).__init__()
-        self.n_mels = torch.jit.Attribute(n_mels, int)
-        self.n_audio_ctx = torch.jit.Attribute(n_audio_ctx, int)
-        self.n_audio_state = torch.jit.Attribute(n_audio_state, int)
-        self.n_audio_head = torch.jit.Attribute(n_audio_head, int)
-        self.n_audio_layer = torch.jit.Attribute(n_audio_layer, int)
-        self.n_vocab = torch.jit.Attribute(n_vocab, int)
-        self.n_text_ctx = torch.jit.Attribute(n_text_ctx, int)
-        self.n_text_state = torch.jit.Attribute(n_text_state, int)
-        self.n_text_head = torch.jit.Attribute(n_text_head, int)
-        self.n_text_layer = torch.jit.Attribute(n_text_layer, int)
+        super().__init__()
+        self.n_mels = n_mels
+        self.n_audio_ctx = n_audio_ctx
+        self.n_audio_state = n_audio_state
+        self.n_audio_head = n_audio_head
+        self.n_audio_layer = n_audio_layer
+        self.n_vocab = n_vocab
+        self.n_text_ctx = n_text_ctx
+        self.n_text_state = n_text_state
+        self.n_text_head = n_text_head
+        self.n_text_layer = n_text_layer
 
 
 class LayerNorm(nn.Module):
@@ -214,7 +214,7 @@ class TextDecoder(nn.Module):
 class Whisper(nn.Module):
     def __init__(self, dims: ModelDimensions):
         super().__init__()
-        self.dims = dims
+        self.dims = torch.jit.export(dims)
         self.is_multilingual = self.dims.n_vocab == 51865
         self.encoder = AudioEncoder(
             self.dims.n_mels,
