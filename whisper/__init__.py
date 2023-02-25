@@ -10,7 +10,7 @@ from tqdm import tqdm
 
 from .audio import load_audio, log_mel_spectrogram, pad_or_trim
 from .decoding import DecodingOptions, DecodingResult, decode, detect_language
-from .model import Whisper, model_dimensions
+from .model import Whisper, ModelDimensions
 from .transcribe import transcribe
 from .version import __version__
 
@@ -112,7 +112,8 @@ def load_model(name: str, device: Optional[Union[str, torch.device]] = None, dow
         checkpoint = torch.load(fp, map_location=device)
     del checkpoint_file
 
-    model = Whisper(model_dimensions(**checkpoint["dims"]))
+    dims = ModelDimensions(**checkpoint["dims"])
+    model = Whisper(dims)
     model.load_state_dict(checkpoint["model_state_dict"])
 
     return model.to(device)
