@@ -9,20 +9,13 @@ from torch import Tensor
 from torch import nn
 
 
-@torch.jit.script
-class ModelDimensions:
-    def __init__(self, n_mels: int, n_audio_ctx: int, n_audio_state: int, n_audio_head: int, n_audio_layer: int,
-                 n_vocab: int, n_text_ctx: int, n_text_state: int, n_text_head: int, n_text_layer: int):
-        self.n_mels = n_mels
-        self.n_audio_ctx = n_audio_ctx
-        self.n_audio_state = n_audio_state
-        self.n_audio_head = n_audio_head
-        self.n_audio_layer = n_audio_layer
-        self.n_vocab = n_vocab
-        self.n_text_ctx = n_text_ctx
-        self.n_text_state = n_text_state
-        self.n_text_head = n_text_head
-        self.n_text_layer = n_text_layer
+def model_dimensions(n_mels: int, n_audio_ctx: int, n_audio_state: int, n_audio_head: int, n_audio_layer: int,
+                     n_vocab: int, n_text_ctx: int, n_text_state: int, n_text_head: int, n_text_layer: int):
+    return {
+        "n_mels": n_mels, "n_audio_ctx": n_audio_ctx, "n_audio_state": n_audio_state, "n_audio_head": n_audio_head,
+        "n_audio_layer": n_audio_layer, "n_vocab": n_vocab, "n_text_ctx": n_text_ctx, "n_text_state": n_text_state,
+        "n_text_head": n_text_head, "n_text_layer": n_text_layer
+    }
 
 
 class LayerNorm(nn.Module):
@@ -211,28 +204,28 @@ class TextDecoder(nn.Module):
 
 
 class Whisper(nn.Module):
-    def __init__(self, dims: ModelDimensions):
+    def __init__(self, dims: Dict[str, int]):
         super().__init__()
         self.dims = dims
-        self.is_multilingual = self.dims.n_vocab == 51865
+        self.is_multilingual = self.dims["n_vocab"] == 51865
         self.encoder = AudioEncoder(
-            self.dims.n_mels,
-            self.dims.n_audio_ctx,
-            self.dims.n_audio_state,
-            self.dims.n_audio_head,
-            self.dims.n_audio_layer,
+            self.dims["n_mels"],
+            self.dims["n_audio_ctx"],
+            self.dims["n_audio_state"],
+            self.dims["n_audio_head"],
+            self.dims["n_audio_layer"],
         )
         self.decoder = TextDecoder(
-            self.dims.n_vocab,
-            self.dims.n_text_ctx,
-            self.dims.n_text_state,
-            self.dims.n_text_head,
-            self.dims.n_text_layer,
+            self.dims["n_vocab"],
+            self.dims["n_text_ctx"],
+            self.dims["n_text_state"],
+            self.dims["n_text_head"],
+            self.dims["n_text_layer"],
         )
 
     @torch.jit.export
-    def get_dims(self) -> ModelDimensions:
-        return self.dims
+    def get_dims(self, name: str) -> int:
+        return self.dims[name]
 
     @torch.jit.export
     def embed_audio(self, mel: torch.Tensor):
