@@ -6,10 +6,12 @@ import torch
 import torch.nn.functional as F
 from torch import Tensor
 from torch.distributions import Categorical
+from torch import nn
 
 from .audio import CHUNK_LENGTH
 from .tokenizer import Tokenizer, get_tokenizer
 from .utils import compression_ratio
+from .model import MultiHeadAttention
 
 if TYPE_CHECKING:
     from .model import Whisper
@@ -76,24 +78,24 @@ class DecodingOptions:
     # sampling-related options
     temperature: float = 0.0
     sample_len: Optional[int] = None  # maximum number of tokens to sample
-    best_of: Optional[int] = None     # number of independent samples to collect, when t > 0
-    beam_size: Optional[int] = None   # number of beams in beam search, when t == 0
+    best_of: Optional[int] = None  # number of independent samples to collect, when t > 0
+    beam_size: Optional[int] = None  # number of beams in beam search, when t == 0
     patience: Optional[float] = None  # patience in beam search (https://arxiv.org/abs/2204.05424)
 
     # options for ranking generations (either beams or best-of-N samples)
-    length_penalty: Optional[float] = None   # "alpha" in Google NMT, None defaults to length norm
+    length_penalty: Optional[float] = None  # "alpha" in Google NMT, None defaults to length norm
 
     # prompt, prefix, and token suppression
-    prompt: Optional[Union[str, List[int]]] = None   # text or tokens for the previous context
-    prefix: Optional[Union[str, List[int]]] = None   # text or tokens to prefix the current context
-    suppress_blank: bool = True                      # this will suppress blank outputs
+    prompt: Optional[Union[str, List[int]]] = None  # text or tokens for the previous context
+    prefix: Optional[Union[str, List[int]]] = None  # text or tokens to prefix the current context
+    suppress_blank: bool = True  # this will suppress blank outputs
 
     # list of tokens ids (or comma-separated token ids) to suppress
     # "-1" will suppress a set of symbols as defined in `tokenizer.non_speech_tokens()`
     suppress_tokens: Optional[Union[str, Iterable[int]]] = "-1"
 
     # timestamp sampling options
-    without_timestamps: bool = False              # use <|notimestamps|> to sample text tokens only
+    without_timestamps: bool = False  # use <|notimestamps|> to sample text tokens only
     max_initial_timestamp: Optional[float] = 1.0  # the initial timestamp cannot be later than this
 
     # implementation details
@@ -127,6 +129,41 @@ class Inference:
         pass
 
 
+def install_kv_cache_hooks(model, cache: Optional[Dict[int, Tensor]] = None):
+    """
+        The `MultiHeadAttention` module optionally accepts `kv_cache` which stores the key and value
+        tensors calculated for the previous positions. This method returns a dictionary that stores
+        all caches, and the necessary hooks for the key and value projection modules that save the
+        intermediate tensors to be reused during later calculations.
+
+        Returns
+        -------
+        cache : Dict[nn.Module, torch.Tensor]
+            A dictionary object mapping the key/value projection modules to its cache
+        hooks : List[RemovableHandle]
+            List of PyTorch RemovableHandle objects to stop the hooks to be called
+        """
+    if cache is None:
+        cache = {}
+    hooks = []
+
+    def save_to_cache(module, _, output):
+        hash_of_module = hash(module)
+        if hash_of_module not in cache or output.shape[1] > model.decoder.positional_embedding.shape[0]:
+            cache[hash_of_module] = output  # save as-is, for the first token or cross attention
+        else:
+            cache[hash_of_module] = torch.cat([cache[hash_of_module], output], dim=1).detach()
+        return cache[hash_of_module]
+
+    def install_hooks(layer: nn.Module):
+        if isinstance(layer, MultiHeadAttention):
+            hooks.append(layer.key.register_forward_hook(save_to_cache))
+            hooks.append(layer.value.register_forward_hook(save_to_cache))
+
+    model.decoder.apply(install_hooks)
+    return cache, hooks
+
+
 class PyTorchInference(Inference):
     def __init__(self, model: "Whisper", initial_token_length: int):
         self.model: "Whisper" = model
@@ -136,7 +173,7 @@ class PyTorchInference(Inference):
 
     def logits(self, tokens: Tensor, audio_features: Tensor) -> Tensor:
         if not self.kv_cache:
-            self.kv_cache, self.hooks = self.model.install_kv_cache_hooks()
+            self.kv_cache, self.hooks = install_kv_cache_hooks(self.model)
 
         if tokens.shape[-1] > self.initial_token_length:
             # only need to use the last token except in the first forward pass
@@ -222,7 +259,7 @@ class TokenDecoder:
         raise NotImplementedError
 
     def finalize(
-        self, tokens: Tensor, sum_logprobs: Tensor
+            self, tokens: Tensor, sum_logprobs: Tensor
     ) -> Tuple[Sequence[Sequence[Tensor]], List[List[float]]]:
         """Finalize search and return the final candidate sequences
 
@@ -399,7 +436,7 @@ class SuppressTokens(LogitFilter):
 
 class ApplyTimestampRules(LogitFilter):
     def __init__(
-        self, tokenizer: Tokenizer, sample_begin: int, max_initial_timestamp_index: Optional[int]
+            self, tokenizer: Tokenizer, sample_begin: int, max_initial_timestamp_index: Optional[int]
     ):
         self.tokenizer = tokenizer
         self.sample_begin = sample_begin
@@ -412,21 +449,21 @@ class ApplyTimestampRules(LogitFilter):
 
         # timestamps have to appear in pairs, except directly before EOT; mask logits accordingly
         for k in range(tokens.shape[0]):
-            sampled_tokens = tokens[k, self.sample_begin :]
+            sampled_tokens = tokens[k, self.sample_begin:]
             seq = [t for t in sampled_tokens.tolist()]
             last_was_timestamp = len(seq) >= 1 and seq[-1] >= self.tokenizer.timestamp_begin
             penultimate_was_timestamp = len(seq) < 2 or seq[-2] >= self.tokenizer.timestamp_begin
 
             if last_was_timestamp:
                 if penultimate_was_timestamp:  # has to be non-timestamp
-                    logits[k, self.tokenizer.timestamp_begin :] = -np.inf
+                    logits[k, self.tokenizer.timestamp_begin:] = -np.inf
                 else:  # cannot be normal text tokens
                     logits[k, : self.tokenizer.eot] = -np.inf
 
             timestamps = sampled_tokens[sampled_tokens.ge(self.tokenizer.timestamp_begin)]
             if timestamps.numel() > 0:
                 # timestamps shouldn't decrease; forbid timestamp tokens smaller than the last
-                logits[k, self.tokenizer.timestamp_begin : timestamps[-1]] = -np.inf
+                logits[k, self.tokenizer.timestamp_begin: timestamps[-1]] = -np.inf
 
         if tokens.shape[1] == self.sample_begin:
             # suppress generating non-timestamp tokens at the beginning
@@ -435,12 +472,12 @@ class ApplyTimestampRules(LogitFilter):
             # apply the `max_initial_timestamp` option
             if self.max_initial_timestamp_index is not None:
                 last_allowed = self.tokenizer.timestamp_begin + self.max_initial_timestamp_index
-                logits[:, last_allowed + 1 :] = -np.inf
+                logits[:, last_allowed + 1:] = -np.inf
 
         # if sum of probability over timestamps is above any other token, sample timestamp
         logprobs = F.log_softmax(logits.float(), dim=-1)
         for k in range(tokens.shape[0]):
-            timestamp_logprob = logprobs[k, self.tokenizer.timestamp_begin :].logsumexp(dim=-1)
+            timestamp_logprob = logprobs[k, self.tokenizer.timestamp_begin:].logsumexp(dim=-1)
             max_text_token_logprob = logprobs[k, : self.tokenizer.timestamp_begin].max()
             if timestamp_logprob > max_text_token_logprob:
                 logits[k, : self.tokenizer.timestamp_begin] = -np.inf
@@ -530,7 +567,7 @@ class DecodingTask:
             prompt_tokens = (
                 self.tokenizer.encode(" " + prompt.strip()) if isinstance(prompt, str) else prompt
             )
-            tokens = [self.tokenizer.sot_prev] + prompt_tokens[-(self.n_ctx // 2 - 1) :] + tokens
+            tokens = [self.tokenizer.sot_prev] + prompt_tokens[-(self.n_ctx // 2 - 1):] + tokens
 
         return tuple(tokens)
 
@@ -650,7 +687,7 @@ class DecodingTask:
         # get the final candidates for each group, and slice between the first sampled token and EOT
         tokens, sum_logprobs = self.decoder.finalize(tokens, sum_logprobs)
         tokens: List[List[Tensor]] = [
-            [t[self.sample_begin : (t == tokenizer.eot).nonzero()[0, 0]] for t in s] for s in tokens
+            [t[self.sample_begin: (t == tokenizer.eot).nonzero()[0, 0]] for t in s] for s in tokens
         ]
 
         # select the top-ranked sample in each group
@@ -681,7 +718,8 @@ class DecodingTask:
 
 
 @torch.no_grad()
-def decode(model: "Whisper", mel: Tensor, options: DecodingOptions = DecodingOptions()) -> Union[DecodingResult, List[DecodingResult]]:
+def decode(model: "Whisper", mel: Tensor, options: DecodingOptions = DecodingOptions()) -> Union[
+    DecodingResult, List[DecodingResult]]:
     """
     Performs decoding of 30-second audio segment(s), provided as Mel spectrogram(s).
 
