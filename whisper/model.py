@@ -8,8 +8,6 @@ import torch.nn.functional as F
 from torch import Tensor
 from torch import nn
 
-from .transcribe import transcribe as transcribe_function
-
 
 class ModelDimensions:
     def __init__(self, n_mels: int, n_audio_ctx: int, n_audio_state: int, n_audio_head: int, n_audio_layer: int,
