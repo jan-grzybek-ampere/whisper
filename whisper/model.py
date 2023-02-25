@@ -10,9 +10,10 @@ from torch import nn
 
 
 @torch.jit.export
-class ModelDimensions:
+class ModelDimensions(torch.jit.ScriptModule):
     def __init__(self, n_mels: int, n_audio_ctx: int, n_audio_state: int, n_audio_head: int, n_audio_layer: int,
                  n_vocab: int, n_text_ctx: int, n_text_state: int, n_text_head: int, n_text_layer: int):
+        super().__init__()
         self.n_mels = n_mels
         self.n_audio_ctx = n_audio_ctx
         self.n_audio_state = n_audio_state
@@ -211,11 +212,9 @@ class TextDecoder(nn.Module):
 
 
 class Whisper(nn.Module):
-    dims: ModelDimensions
-
     def __init__(self, dims: ModelDimensions):
         super().__init__()
-        self.dims = torch.jit.export(dims)
+        self.dims = dims
         self.is_multilingual = self.dims.n_vocab == 51865
         self.encoder = AudioEncoder(
             self.dims.n_mels,
