@@ -239,7 +239,7 @@ class Whisper(nn.Module):
     def forward(self, mel: torch.Tensor, tokens: torch.Tensor) -> Tensor:
         return self.decoder(tokens, self.encoder(mel))
 
-    @torch.jit.export
     @property
+    @torch.jit.export
     def is_multilingual(self):
         return self.dims.n_vocab == 51865
