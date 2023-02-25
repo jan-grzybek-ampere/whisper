@@ -9,6 +9,7 @@ from torch import Tensor
 from torch import nn
 
 
+@torch.jit.script
 class ModelDimensions:
     def __init__(self, n_mels: int, n_audio_ctx: int, n_audio_state: int, n_audio_head: int, n_audio_layer: int,
                  n_vocab: int, n_text_ctx: int, n_text_state: int, n_text_head: int, n_text_layer: int):
@@ -228,10 +229,6 @@ class Whisper(nn.Module):
             self.dims.n_text_head,
             self.dims.n_text_layer,
         )
-
-    @torch.jit.export
-    def noname(self):
-        return self.dims, self.is_multilingual
 
     @torch.jit.export
     def embed_audio(self, mel: torch.Tensor):
