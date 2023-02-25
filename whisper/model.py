@@ -211,9 +211,9 @@ class TextDecoder(nn.Module):
 
 
 class Whisper(nn.Module):
-    def __init__(self, dims: ModelDimensions):
+    def __init__(self, dims):
         super().__init__()
-        self.dims = dims
+        self.dims = ModelDimensions(**dims)
         self.is_multilingual = self.dims.n_vocab == 51865
         self.encoder = AudioEncoder(
             self.dims.n_mels,

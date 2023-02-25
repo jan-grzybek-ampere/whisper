@@ -112,8 +112,7 @@ def load_model(name: str, device: Optional[Union[str, torch.device]] = None, dow
         checkpoint = torch.load(fp, map_location=device)
     del checkpoint_file
 
-    dims = ModelDimensions(**checkpoint["dims"])
-    model = Whisper(dims)
+    model = Whisper(checkpoint["dims"])
     model.load_state_dict(checkpoint["model_state_dict"])
 
     return model.to(device)
