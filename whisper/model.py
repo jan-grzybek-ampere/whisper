@@ -214,7 +214,6 @@ class Whisper(nn.Module):
     def __init__(self, dims: ModelDimensions):
         super().__init__()
         self.dims = dims
-        self.is_multilingual = self.dims.n_vocab == 51865
         self.encoder = AudioEncoder(
             self.dims.n_mels,
             self.dims.n_audio_ctx,
@@ -237,6 +236,10 @@ class Whisper(nn.Module):
     @torch.jit.export
     def logits(self, tokens: torch.Tensor, audio_features: torch.Tensor):
         return self.decoder(tokens, audio_features)
+
+    @torch.jit.export
+    def is_multilingual(self):
+        return self.dims.n_vocab == 51865
 
     def forward(self, mel: torch.Tensor, tokens: torch.Tensor) -> Tensor:
         return self.decoder(tokens, self.encoder(mel))
