@@ -42,10 +42,7 @@ def _download(url: str, root: str, in_memory: bool) -> Union[bytes, str]:
     if os.path.isfile(download_target):
         with open(download_target, "rb") as f:
             model_bytes = f.read()
-        if hashlib.sha256(model_bytes).hexdigest() == expected_sha256:
-            return model_bytes if in_memory else download_target
-        else:
-            warnings.warn(f"{download_target} exists, but the SHA256 checksum does not match; re-downloading the file")
+        return model_bytes if in_memory else download_target
 
     with urllib.request.urlopen(url) as source, open(download_target, "wb") as output:
         with tqdm(total=int(source.info().get("Content-Length")), ncols=80, unit='iB', unit_scale=True, unit_divisor=1024) as loop:
