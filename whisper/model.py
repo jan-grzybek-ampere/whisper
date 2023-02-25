@@ -237,5 +237,9 @@ class Whisper(nn.Module):
     def logits(self, tokens: torch.Tensor, audio_features: torch.Tensor):
         return self.decoder(tokens, audio_features)
 
+    @torch.jit.export
+    def decode_with_cache(self, tokens: torch.Tensor, audio_features: torch.Tensor, kv_cache: Dict[int, Tensor]):
+        return self.decoder(tokens, audio_features, kv_cache)
+
     def forward(self, mel: torch.Tensor, tokens: torch.Tensor) -> Tensor:
         return self.decoder(tokens, self.encoder(mel))
