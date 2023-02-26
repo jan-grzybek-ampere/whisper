@@ -213,8 +213,6 @@ class Whisper(nn.Module):
             self.dims.n_text_head,
             self.dims.n_text_layer,
         )
-        self._decoder_traced = None
-        self._retrace = False
 
     def encoder(self, x: Tensor):
         if type(self._encoder) is not torch.jit.ScriptModule:
@@ -222,13 +220,9 @@ class Whisper(nn.Module):
         return self._encoder(x)
 
     def decoder(self, x: Tensor, xa: Tensor, kv_cache: Optional[dict] = None):
-        if bool(kv_cache) and self._retrace:
-            self._decoder_traced = torch.jit.trace(self._decoder, example_inputs=(x, xa, kv_cache))
-            self._retrace = False
-            print("DONE!")
-        elif self._retrace:
-            return self._decoder(x, xa, kv_cache)
-        return self._decoder_traced(x, xa, kv_cache)
+        if bool(kv_cache) and type(self._decoder) is not torch.jit.ScriptModule:
+            self._decoder = torch.jit.trace(self._decoder, example_inputs=(x, xa, kv_cache), strict=False)
+        return self._decoder(x, xa, kv_cache)
 
     def embed_audio(self, mel: torch.Tensor):
         return self.encoder(mel)
@@ -278,7 +272,6 @@ class Whisper(nn.Module):
                 hooks.append(layer.value.register_forward_hook(save_to_cache))
 
         self._decoder.apply(install_hooks)
-        self._retrace = True
         return cache, hooks
 
     detect_language = detect_language_function
