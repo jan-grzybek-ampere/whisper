@@ -259,7 +259,7 @@ class Whisper(nn.Module):
         hooks = []
 
         def save_to_cache(module, _, output):
-            if module not in cache or output.shape[1] > self.decoder.positional_embedding.shape[0]:
+            if module not in cache or output.shape[1] > self._decoder.positional_embedding.shape[0]:
                 cache[module] = output  # save as-is, for the first token or cross attention
             else:
                 cache[module] = torch.cat([cache[module], output], dim=1).detach()
@@ -270,7 +270,7 @@ class Whisper(nn.Module):
                 hooks.append(layer.key.register_forward_hook(save_to_cache))
                 hooks.append(layer.value.register_forward_hook(save_to_cache))
 
-        self.decoder.apply(install_hooks)
+        self._decoder.apply(install_hooks)
         return cache, hooks
 
     detect_language = detect_language_function
