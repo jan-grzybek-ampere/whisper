@@ -138,6 +138,7 @@ class PyTorchInference(Inference):
         if not self.kv_cache:
             print("YOOOO")
             self.kv_cache, self.hooks = self.model.install_kv_cache_hooks()
+            self.model.decoder = torch.jit.trace(self.model.decoder, (tokens, audio_features, self.kv_cache))
 
         if tokens.shape[-1] > self.initial_token_length:
             # only need to use the last token except in the first forward pass
