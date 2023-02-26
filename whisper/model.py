@@ -215,14 +215,12 @@ class Whisper(nn.Module):
         )
 
     def encoder(self, x: Tensor):
-        if type(self._encoder) is not torch.jit.ScriptModule:
+        if type(self._encoder) is not torch.jit._trace.TopLevelTracedModule:
             self._encoder = torch.jit.trace(self._encoder, example_inputs=x)
-        print(type(self._encoder))
-        dsf
         return self._encoder(x)
 
     def decoder(self, x: Tensor, xa: Tensor, kv_cache: Optional[dict] = None):
-        if bool(kv_cache) and type(self._decoder) is not torch.jit.ScriptModule:
+        if bool(kv_cache) and type(self._decoder) is not torch.jit._trace.TopLevelTracedModule:
             self._decoder = torch.jit.trace(self._decoder, example_inputs=(x, xa, kv_cache), check_trace=False)
         return self._decoder(x, xa, kv_cache)
 
