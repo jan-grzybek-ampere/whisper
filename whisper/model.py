@@ -220,8 +220,13 @@ class Whisper(nn.Module):
         return self._encoder(x)
 
     def decoder(self, x: Tensor, xa: Tensor, kv_cache: Optional[dict] = None):
+        print("-------")
         if kv_cache is not None:
             print(len(kv_cache))
+            for i, j in kv_cache.items():
+                print(f"{i}: {j.shape}")
+        else:
+            print("None")
         if False and bool(kv_cache) and type(self._decoder) is not torch.jit.ScriptModule:
             self._decoder = torch.jit.trace(self._decoder, example_inputs=(x, xa, kv_cache))
         return self._decoder(x, xa, kv_cache)
