@@ -199,20 +199,30 @@ class Whisper(nn.Module):
     def __init__(self, dims: ModelDimensions):
         super().__init__()
         self.dims = dims
-        self.encoder = AudioEncoder(
+        self._encoder = AudioEncoder(
             self.dims.n_mels,
             self.dims.n_audio_ctx,
             self.dims.n_audio_state,
             self.dims.n_audio_head,
             self.dims.n_audio_layer,
         )
-        self.decoder = TextDecoder(
+        self._decoder = TextDecoder(
             self.dims.n_vocab,
             self.dims.n_text_ctx,
             self.dims.n_text_state,
             self.dims.n_text_head,
             self.dims.n_text_layer,
         )
+
+    def encoder(self, x: Tensor):
+        if type(self._encoder) is not torch.jit.ScriptModule:
+            self._encoder = torch.jit.trace(self._encoder, example_inputs=x)
+        return self._encoder(x)
+
+    def decoder(self, x: Tensor, xa: Tensor, kv_cache: Optional[dict] = None):
+        if type(self._decoder) is not torch.jit.ScriptModule:
+            self._decoder = torch.jit.trace(self._decoder, example_inputs=(x, xa, kv_cache))
+        return self._decoder(x, xa, kv_cache)
 
     def embed_audio(self, mel: torch.Tensor):
         return self.encoder(mel)
