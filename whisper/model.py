@@ -198,7 +198,6 @@ class TextDecoder(nn.Module):
 class Whisper(nn.Module):
     def __init__(self, dims: ModelDimensions):
         super().__init__()
-        self.retrace_decoder = True
         self.dims = dims
         self._encoder = AudioEncoder(
             self.dims.n_mels,
@@ -206,14 +205,14 @@ class Whisper(nn.Module):
             self.dims.n_audio_state,
             self.dims.n_audio_head,
             self.dims.n_audio_layer,
-        )
+        ).eval()
         self._decoder = TextDecoder(
             self.dims.n_vocab,
             self.dims.n_text_ctx,
             self.dims.n_text_state,
             self.dims.n_text_head,
             self.dims.n_text_layer,
-        )
+        ).eval()
 
     def encoder(self, x: Tensor):
         if type(self._encoder) is not torch.jit.ScriptModule:
@@ -221,9 +220,9 @@ class Whisper(nn.Module):
         return self._encoder(x)
 
     def decoder(self, x: Tensor, xa: Tensor, kv_cache: Optional[dict] = None):
-        if bool(kv_cache) and self.retrace_decoder:
+        if bool(kv_cache) and type(self._decoder) is not torch.jit.ScriptModule:
             self._decoder = torch.jit.trace(self._decoder, example_inputs=(x, xa, kv_cache))
-            self.retrace_decoder = False
+            print("DONE!")
         return self._decoder(x, xa, kv_cache)
 
     def embed_audio(self, mel: torch.Tensor):
@@ -273,9 +272,7 @@ class Whisper(nn.Module):
                 hooks.append(layer.key.register_forward_hook(save_to_cache))
                 hooks.append(layer.value.register_forward_hook(save_to_cache))
 
-        print("yo")
         self._decoder.apply(install_hooks)
-        self.retrace_decoder = True
         return cache, hooks
 
     detect_language = detect_language_function
