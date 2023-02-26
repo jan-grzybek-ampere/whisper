@@ -213,6 +213,8 @@ class Whisper(nn.Module):
             self.dims.n_text_head,
             self.dims.n_text_layer,
         )
+        self._traced_decoder = None
+        self._retrace = False
 
     def encoder(self, x: Tensor):
         if type(self._encoder) is not torch.jit._trace.TopLevelTracedModule:
@@ -220,9 +222,12 @@ class Whisper(nn.Module):
         return self._encoder(x)
 
     def decoder(self, x: Tensor, xa: Tensor, kv_cache: Optional[dict] = None):
-        if bool(kv_cache) and type(self._decoder) is not torch.jit._trace.TopLevelTracedModule:
-            self._decoder = torch.jit.trace(self._decoder, example_inputs=(x, xa, kv_cache), check_trace=False)
-        return self._decoder(x, xa, kv_cache)
+        if bool(kv_cache) and self._retrace:
+            self._traced_decoder = torch.jit.trace(self._decoder, example_inputs=(x, xa, kv_cache), check_trace=False)
+            self._retrace = False
+        elif self._retrace:
+            return self._decoder(x, xa, kv_cache)
+        return self._traced_decoder(x, xa, kv_cache)
 
     def embed_audio(self, mel: torch.Tensor):
         return self.encoder(mel)
@@ -241,7 +246,6 @@ class Whisper(nn.Module):
     def is_multilingual(self):
         return self.dims.n_vocab == 51865
 
-    @torch.jit.ignore
     def install_kv_cache_hooks(self, cache: Optional[dict] = None):
         """
         The `MultiHeadAttention` module optionally accepts `kv_cache` which stores the key and value
@@ -273,7 +277,7 @@ class Whisper(nn.Module):
                 hooks.append(layer.value.register_forward_hook(save_to_cache))
 
         self._decoder.apply(install_hooks)
-        print("yo")
+        self._retrace = True
         return cache, hooks
 
     detect_language = detect_language_function
