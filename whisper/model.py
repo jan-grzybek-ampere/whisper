@@ -215,6 +215,8 @@ class Whisper(nn.Module):
         )
 
     def encoder(self, x: Tensor):
+        print(type(self._encoder))
+        dsf
         if type(self._encoder) is not torch.jit.ScriptModule:
             self._encoder = torch.jit.trace(self._encoder, example_inputs=x)
         return self._encoder(x)
