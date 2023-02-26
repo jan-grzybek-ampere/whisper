@@ -198,6 +198,7 @@ class TextDecoder(nn.Module):
 class Whisper(nn.Module):
     def __init__(self, dims: ModelDimensions):
         super().__init__()
+        self.retrace_decoder = True
         self.dims = dims
         self._encoder = AudioEncoder(
             self.dims.n_mels,
@@ -206,7 +207,7 @@ class Whisper(nn.Module):
             self.dims.n_audio_head,
             self.dims.n_audio_layer,
         )
-        self.decoder = TextDecoder(
+        self._decoder = TextDecoder(
             self.dims.n_vocab,
             self.dims.n_text_ctx,
             self.dims.n_text_state,
@@ -219,11 +220,11 @@ class Whisper(nn.Module):
             self._encoder = torch.jit.trace(self._encoder, example_inputs=x)
         return self._encoder(x)
 
-    # def decoder(self, x: Tensor, xa: Tensor, kv_cache: Optional[dict] = None):
-    #     if bool(kv_cache) and type(self._decoder) is not torch.jit.ScriptModule:
-    #         self._decoder = torch.jit.trace(self._decoder, example_inputs=(x, xa, kv_cache))
-    #         print("DONE!")
-    #     return self._decoder(x, xa, kv_cache)
+    def decoder(self, x: Tensor, xa: Tensor, kv_cache: Optional[dict] = None):
+        if bool(kv_cache) and self.retrace_decoder:
+            self._decoder = torch.jit.trace(self._decoder, example_inputs=(x, xa, kv_cache))
+            self.retrace_decoder = False
+        return self._decoder(x, xa, kv_cache)
 
     def embed_audio(self, mel: torch.Tensor):
         return self.encoder(mel)
@@ -261,7 +262,7 @@ class Whisper(nn.Module):
 
         def save_to_cache(module, _, output):
             id_of_module = id(module)
-            if id_of_module not in cache or output.shape[1] > self.decoder.positional_embedding.shape[0]:
+            if id_of_module not in cache or output.shape[1] > self._decoder.positional_embedding.shape[0]:
                 cache[id_of_module] = output  # save as-is, for the first token or cross attention
             else:
                 cache[id_of_module] = torch.cat([cache[id_of_module], output], dim=1).detach()
@@ -272,7 +273,7 @@ class Whisper(nn.Module):
                 hooks.append(layer.key.register_forward_hook(save_to_cache))
                 hooks.append(layer.value.register_forward_hook(save_to_cache))
 
-        self.decoder.apply(install_hooks)
+        self._decoder.apply(install_hooks)
         return cache, hooks
 
     detect_language = detect_language_function
