@@ -130,7 +130,7 @@ def load_model(name: str, device: Optional[Union[str, torch.device]] = None, dow
 
     checkpoint["model_state_dict"] = rename_state_dict_keys(
         checkpoint["model_state_dict"],
-        lambda old_key: old_key.replace("encoder", "_encoder").replace("decoder", "_decoder")
+        lambda old_key: old_key.replace("encoder", "_encoder")
     )
 
     dims = ModelDimensions(**checkpoint["dims"])
