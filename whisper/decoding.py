@@ -154,7 +154,7 @@ class PyTorchInference(Inference):
     def rearrange_kv_cache(self, source_indices):
         for module, tensor in self.kv_cache.items():
             # update the key/value cache to contain the selected sequences
-            self.kv_cache[module] = tensor[source_indices].detach()
+            self.kv_cache[id(module)] = tensor[source_indices].detach()
 
 
 class SequenceRanker:
