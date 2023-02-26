@@ -180,8 +180,11 @@ def transcribe(
             segment_duration = segment.shape[-1] * HOP_LENGTH / SAMPLE_RATE
 
             decode_options["prompt"] = all_tokens[prompt_reset_since:]
+            print("0")
             result: DecodingResult = decode_with_fallback(segment)
+            print("1")
             tokens = torch.tensor(result.tokens)
+            print("2")
 
             if no_speech_threshold is not None:
                 # no voice activity check
