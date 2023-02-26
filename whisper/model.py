@@ -272,7 +272,7 @@ class Whisper(nn.Module):
                 hooks.append(layer.key.register_forward_hook(save_to_cache))
                 hooks.append(layer.value.register_forward_hook(save_to_cache))
 
-        self._decoder.apply(install_hooks)
+        #self._decoder.apply(install_hooks)
         return cache, hooks
 
     detect_language = detect_language_function
