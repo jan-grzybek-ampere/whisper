@@ -221,7 +221,7 @@ class Whisper(nn.Module):
 
     def decoder(self, x: Tensor, xa: Tensor, kv_cache: Optional[dict] = None):
         if bool(kv_cache) and type(self._decoder) is not torch.jit.ScriptModule:
-            self._decoder = torch.jit.trace(self._decoder, example_inputs=(x, xa, kv_cache), check_tolerance=False)
+            self._decoder = torch.jit.trace(self._decoder, example_inputs=(x, xa, kv_cache), check_trace=False)
         return self._decoder(x, xa, kv_cache)
 
     def embed_audio(self, mel: torch.Tensor):
