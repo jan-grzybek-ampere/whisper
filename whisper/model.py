@@ -241,6 +241,7 @@ class Whisper(nn.Module):
     def is_multilingual(self):
         return self.dims.n_vocab == 51865
 
+    @torch.jit.ignore
     def install_kv_cache_hooks(self, cache: Optional[dict] = None):
         """
         The `MultiHeadAttention` module optionally accepts `kv_cache` which stores the key and value
