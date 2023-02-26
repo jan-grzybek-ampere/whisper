@@ -3,6 +3,7 @@ import io
 import os
 import urllib
 import warnings
+from collections import OrderedDict
 from typing import List, Optional, Union
 
 import torch
@@ -13,7 +14,6 @@ from .decoding import DecodingOptions, DecodingResult, decode, detect_language
 from .model import Whisper, ModelDimensions
 from .transcribe import transcribe
 from .version import __version__
-
 
 _MODELS = {
     "tiny.en": "https://openaipublic.azureedge.net/main/whisper/models/d3dd57d32accea0b295c96e26691aa14d8822fac7d9d27d5dc00b4ca2826dd03/tiny.en.pt",
@@ -48,7 +48,8 @@ def _download(url: str, root: str, in_memory: bool) -> Union[bytes, str]:
             warnings.warn(f"{download_target} exists, but the SHA256 checksum does not match; re-downloading the file")
 
     with urllib.request.urlopen(url) as source, open(download_target, "wb") as output:
-        with tqdm(total=int(source.info().get("Content-Length")), ncols=80, unit='iB', unit_scale=True, unit_divisor=1024) as loop:
+        with tqdm(total=int(source.info().get("Content-Length")), ncols=80, unit='iB', unit_scale=True,
+                  unit_divisor=1024) as loop:
             while True:
                 buffer = source.read(8192)
                 if not buffer:
@@ -59,7 +60,8 @@ def _download(url: str, root: str, in_memory: bool) -> Union[bytes, str]:
 
     model_bytes = open(download_target, "rb").read()
     if hashlib.sha256(model_bytes).hexdigest() != expected_sha256:
-        raise RuntimeError("Model has been downloaded but the SHA256 checksum does not not match. Please retry loading the model.")
+        raise RuntimeError(
+            "Model has been downloaded but the SHA256 checksum does not not match. Please retry loading the model.")
 
     return model_bytes if in_memory else download_target
 
@@ -69,7 +71,18 @@ def available_models() -> List[str]:
     return list(_MODELS.keys())
 
 
-def load_model(name: str, device: Optional[Union[str, torch.device]] = None, download_root: str = None, in_memory: bool = False) -> Whisper:
+def rename_state_dict_keys(state_dict, key_transformation):
+    new_state_dict = OrderedDict()
+
+    for key, value in state_dict.items():
+        new_key = key_transformation(key)
+        new_state_dict[new_key] = value
+
+    return new_state_dict
+
+
+def load_model(name: str, device: Optional[Union[str, torch.device]] = None, download_root: str = None,
+               in_memory: bool = False) -> Whisper:
     """
     Load a Whisper ASR model
 
@@ -114,6 +127,9 @@ def load_model(name: str, device: Optional[Union[str, torch.device]] = None, dow
     with (io.BytesIO(checkpoint_file) if in_memory else open(checkpoint_file, "rb")) as fp:
         checkpoint = torch.load(fp, map_location=device)
     del checkpoint_file
+
+    checkpoint = rename_state_dict_keys(
+        checkpoint, lambda old_key: old_key.replace("encoder", "_encoder").replace("decoder", "_decoder"))
 
     dims = ModelDimensions(**checkpoint["dims"])
     model = Whisper(dims)
