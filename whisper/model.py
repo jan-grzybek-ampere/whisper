@@ -222,6 +222,7 @@ class Whisper(nn.Module):
         return self._encoder(x)
 
     def decoder(self, x: Tensor, xa: Tensor, kv_cache: Optional[dict] = None):
+        return self._decoder(x, xa, kv_cache)
         if bool(kv_cache) and self._retrace:
             self._traced_decoder = torch.jit.trace(self._decoder, example_inputs=(x, xa, kv_cache), check_trace=False)
             self._retrace = False
